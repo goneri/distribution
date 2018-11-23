@@ -509,6 +509,15 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 		} else {
 			err = d.Conn.ObjectMove(d.Container, d.swiftPath(sourcePath), d.Container, d.swiftPath(destPath))
 		}
+
+		// Ensure the final size match our expectation
+		info, err := d.Stat(ctx, destPath)
+		oldSize := headers["Content-Length"]
+		newSize := strconv.FormatInt(info.Size(), 10)
+		if err == nil && oldSize != newSize {
+			d.Delete(ctx, destPath)
+			err = fmt.Errorf("Inconsistent size after Move: %s (%s != %s)", destPath, oldSize, newSize)
+		}
 	}
 	if err == swift.ObjectNotFound {
 		return storagedriver.PathNotFoundError{Path: sourcePath}
